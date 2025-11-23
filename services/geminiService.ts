@@ -1,6 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Vite projelerinde env değişkenlerine import.meta.env ile erişilir.
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+
+let ai: GoogleGenAI | null = null;
+
+if (API_KEY) {
+  ai = new GoogleGenAI({ apiKey: API_KEY });
+} else {
+  console.warn("UYARI: VITE_GEMINI_API_KEY bulunamadı. AI özellikleri çalışmayacaktır.");
+}
 
 export const generateCreativeDescription = async (
   imageBase64: string | null,
@@ -8,7 +17,12 @@ export const generateCreativeDescription = async (
   colorName: string
 ): Promise<string> => {
   
-  const model = 'gemini-2.5-flash';
+  if (!ai) {
+    return "AI servisi yapılandırılmamış (API Key eksik).";
+  }
+
+  // Model ismini güncel ve kararlı bir versiyon seçtik
+  const modelId = 'gemini-1.5-flash'; 
   
   let promptText = `Sen "Cosna" adında niş, minimalist ve sanatsal bir t-shirt markasının marka yöneticisisin. 
   Müşteri ${colorName} renginde bir t-shirt tasarladı.`;
@@ -28,22 +42,23 @@ export const generateCreativeDescription = async (
     const parts: any[] = [{ text: promptText }];
 
     if (imageBase64) {
-      // Clean base64 string if it has prefix
-      const base64Data = imageBase64.split(',')[1] || imageBase64;
+      // Base64 başlığını temizle
+      const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+      
       parts.push({
         inlineData: {
-          mimeType: 'image/png', // Assuming PNG/JPEG from input, generic handling
+          mimeType: 'image/png', 
           data: base64Data
         }
       });
     }
 
     const response = await ai.models.generateContent({
-      model: model,
+      model: modelId,
       contents: { parts },
     });
 
-    return response.text || "Tasarımınız harika görünüyor!";
+    return response.text() || "Tasarımınız harika görünüyor!";
   } catch (error) {
     console.error("Gemini Error:", error);
     return "Benzersiz tasarımınız, Cosna kalitesiyle buluşmaya hazır.";
