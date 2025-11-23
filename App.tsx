@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import ProductViewer from './components/ProductViewer';
@@ -6,8 +5,16 @@ import ReviewSection from './components/ReviewSection';
 import { CartDrawer, FavoritesDrawer, AuthModal } from './components/Sidebars';
 import { TSHIRT_COLORS, FONT_OPTIONS } from './constants';
 import { Placement, CustomizedProduct } from './types';
-import { Upload, Type, RefreshCw, Wand2, ArrowRight, Trash2, Sparkles, Instagram, Twitter, Facebook } from 'lucide-react';
+import { Upload, Type, RefreshCw, Wand2, ArrowRight, Trash2, Sparkles, Instagram, Twitter, Facebook, CheckCircle } from 'lucide-react';
 import { generateCreativeDescription } from './services/geminiService';
+
+// --- Toast Component ---
+const Toast = ({ message, onClose }: { message: string, onClose: () => void }) => (
+  <div className="fixed top-24 right-4 bg-black text-white px-6 py-4 flex items-center gap-3 shadow-hard z-50 animate-fade-in-up border-2 border-white">
+    <CheckCircle className="text-accent" size={24} />
+    <span className="font-bold uppercase tracking-widest text-sm">{message}</span>
+  </div>
+);
 
 const App: React.FC = () => {
   // Navigation State
@@ -24,16 +31,43 @@ const App: React.FC = () => {
   const [aiDescription, setAiDescription] = useState<string>('');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
-  // App Functional State
-  const [cartItems, setCartItems] = useState<CustomizedProduct[]>([]);
-  const [favoriteItems, setFavoriteItems] = useState<CustomizedProduct[]>([]);
+  // App Functional State (with Persistence)
+  const [cartItems, setCartItems] = useState<CustomizedProduct[]>(() => {
+    const saved = localStorage.getItem('cosna_cart');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [favoriteItems, setFavoriteItems] = useState<CustomizedProduct[]>(() => {
+    const saved = localStorage.getItem('cosna_favorites');
+    return saved ? JSON.parse(saved) : [];
+  });
   
-  // UI State (Modals/Drawers)
+  // UI State
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Persistence Effects
+  useEffect(() => {
+    localStorage.setItem('cosna_cart', JSON.stringify(cartItems));
+  }, [cartItems]);
+
+  useEffect(() => {
+    localStorage.setItem('cosna_favorites', JSON.stringify(favoriteItems));
+  }, [favoriteItems]);
+
+  // Toast Timer
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  const showToast = (msg: string) => setToastMessage(msg);
 
   // Scroll to top on view change
   useEffect(() => {
@@ -43,10 +77,14 @@ const App: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("Dosya boyutu 2MB'dan küçük olmalıdır.");
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setUploadedImage(reader.result as string);
-        setAiDescription(''); // Reset AI description when content changes
+        setAiDescription('');
       };
       reader.readAsDataURL(file);
     }
@@ -63,7 +101,7 @@ const App: React.FC = () => {
 
   const addToCart = () => {
     const newItem: CustomizedProduct = {
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       color: selectedColor,
       customText,
       font: selectedFont,
@@ -74,6 +112,7 @@ const App: React.FC = () => {
     };
     setCartItems([...cartItems, newItem]);
     setIsCartOpen(true);
+    showToast("Added to Cart");
   };
 
   const removeFromCart = (id: string) => {
@@ -81,8 +120,9 @@ const App: React.FC = () => {
   };
 
   const toggleFavorite = () => {
+    // Basit toggle mantığı (id yerine özellik kontrolü yapılabilir, şimdilik her ekleme yeni item)
     const newItem: CustomizedProduct = {
-      id: Date.now().toString(), 
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       color: selectedColor,
       customText,
       font: selectedFont,
@@ -92,7 +132,7 @@ const App: React.FC = () => {
       dateAdded: Date.now()
     };
     setFavoriteItems([newItem, ...favoriteItems]);
-    setIsFavoritesOpen(true);
+    showToast("Saved to Wishlist");
   };
 
   const removeFromFavorites = (id: string) => {
@@ -104,22 +144,20 @@ const App: React.FC = () => {
     removeFromFavorites(item.id);
     setIsFavoritesOpen(false);
     setIsCartOpen(true);
+    showToast("Moved to Cart");
   };
 
   // --- SUB-COMPONENTS FOR LANDING PAGE ---
 
   const HeroSection = () => (
     <div className="relative h-[90vh] w-full overflow-hidden flex items-center justify-center bg-black">
-      {/* Background Image */}
       <img 
         src="https://images.unsplash.com/photo-1617387680907-2856a2e245da?q=80&w=2669&auto=format&fit=crop" 
         alt="Streetwear Style" 
         className="absolute inset-0 w-full h-full object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-1000"
       />
-      {/* Noise Texture Overlay */}
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
       
-      {/* Content */}
       <div className="relative z-10 text-center px-4 w-full max-w-5xl mx-auto">
         <div className="inline-block bg-accent text-black px-3 py-1 text-sm font-black uppercase tracking-widest mb-6 rotate-2 hover:rotate-0 transition-transform cursor-default">
           New Season Drop
@@ -150,8 +188,6 @@ const App: React.FC = () => {
         <span className="mx-8 text-white stroke-black text-stroke-1">NO MINIMUMS</span>
         <span className="mx-8">/// PREMIUM COTTON</span>
         <span className="mx-8 text-white stroke-black text-stroke-1">DROP 01 LIVE</span>
-        <span className="mx-8">/// CUSTOM EMBROIDERY LAB</span>
-        <span className="mx-8 text-white stroke-black text-stroke-1">COSNA STUDIO</span>
       </div>
     </div>
   );
@@ -182,6 +218,8 @@ const App: React.FC = () => {
           -webkit-text-stroke: 1px black;
         }
       `}</style>
+
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
 
       <Navbar 
         cartCount={cartItems.length}
@@ -220,7 +258,6 @@ const App: React.FC = () => {
              <Marquee />
           </div>
 
-          {/* How It Works Section */}
           <section className="py-24 px-4 bg-grid-pattern border-b-2 border-black">
             <div className="max-w-7xl mx-auto">
               <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
@@ -252,7 +289,6 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          {/* Trending Image Grid - Brutalist Layout */}
           <section className="py-24 bg-white">
             <div className="max-w-7xl mx-auto px-4">
                 <div className="flex justify-between items-center mb-12 border-b-4 border-black pb-4">
@@ -284,7 +320,6 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          {/* Footer */}
           <footer className="bg-black text-white pt-20 pb-10 border-t-8 border-accent">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
@@ -336,7 +371,6 @@ const App: React.FC = () => {
 
           <div className="lg:grid lg:grid-cols-12 lg:gap-16">
             
-            {/* Left Column: Visualizer */}
             <div className="lg:col-span-7 mb-8 lg:mb-0">
                <div className="sticky top-28">
                   <ProductViewer 
@@ -349,7 +383,6 @@ const App: React.FC = () => {
                       isFavorite={false}
                   />
                   
-                  {/* Placement Toggle */}
                   <div className="flex justify-center mt-8">
                       <div className="bg-white p-1 border-2 border-black shadow-hard inline-flex">
                           <button
@@ -373,10 +406,8 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            {/* Right Column: Customization Controls */}
             <div className="lg:col-span-5 space-y-10">
               
-              {/* Header Info */}
               <div className="border-b-2 border-black pb-8">
                 <div className="flex justify-between items-start">
                     <h1 className="text-5xl font-black text-black uppercase tracking-tighter leading-none">Boxy Fit <br/> Heavy Tee</h1>
@@ -390,7 +421,6 @@ const App: React.FC = () => {
                 </p>
               </div>
 
-              {/* AI Analysis Box */}
               {(uploadedImage || customText) && (
                 <div className="bg-black text-white p-6 relative overflow-hidden group shadow-hard">
                   <div className="absolute top-0 right-0 p-3 opacity-20">
@@ -422,7 +452,6 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {/* Color Selection */}
               <div className="space-y-4">
                 <label className="text-xs font-black text-black uppercase tracking-widest block">Colorway</label>
                 <div className="flex gap-4">
@@ -442,7 +471,6 @@ const App: React.FC = () => {
                 <span className="text-sm font-bold uppercase">{selectedColor.name}</span>
               </div>
 
-              {/* Upload Design */}
               <div className="space-y-4">
                 <label className="text-xs font-black text-black uppercase tracking-widest block">Upload Graphic</label>
                 <div 
@@ -458,7 +486,7 @@ const App: React.FC = () => {
                   />
                   <Upload className="mb-2 group-hover:scale-110 transition-transform" size={32} />
                   <span className="text-sm font-bold uppercase">Drag & Drop or Click</span>
-                  <span className="text-xs opacity-60 mt-1 font-mono">PNG, JPG (MAX 5MB)</span>
+                  <span className="text-xs opacity-60 mt-1 font-mono">PNG, JPG (MAX 2MB)</span>
                 </div>
                 {uploadedImage && (
                   <button 
@@ -470,7 +498,6 @@ const App: React.FC = () => {
                 )}
               </div>
 
-              {/* Custom Text */}
               <div className="space-y-4">
                 <label className="text-xs font-black text-black uppercase tracking-widest block">Add Tag / Text</label>
                 <div className="relative">
@@ -486,7 +513,6 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Font Selection */}
               {customText && (
                   <div className="space-y-4 animate-fade-in">
                       <label className="text-xs font-black text-black uppercase tracking-widest block">Typography</label>
@@ -509,7 +535,6 @@ const App: React.FC = () => {
                   </div>
               )}
 
-              {/* Action Button */}
               <div className="pt-6 border-t-2 border-black">
                   <button 
                     onClick={addToCart}
@@ -526,7 +551,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* User Generated Content Section - Only visible in product view */}
           <ReviewSection />
 
         </main>
