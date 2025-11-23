@@ -1,19 +1,32 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Review } from '../types';
 import { MOCK_REVIEWS } from '../constants';
-import { Star, Camera, Upload } from 'lucide-react';
+import { Star, Camera } from 'lucide-react';
 
 const ReviewSection: React.FC = () => {
-  const [reviews, setReviews] = useState<Review[]>(MOCK_REVIEWS);
+  // Yorumları localStorage'dan başlat, yoksa MOCK veriyi kullan
+  const [reviews, setReviews] = useState<Review[]>(() => {
+    const saved = localStorage.getItem('cosna_reviews');
+    return saved ? JSON.parse(saved) : MOCK_REVIEWS;
+  });
+
   const [newComment, setNewComment] = useState('');
   const [newRating, setNewRating] = useState(5);
   const [photo, setPhoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Yorumlar değiştiğinde kaydet
+  useEffect(() => {
+    localStorage.setItem('cosna_reviews', JSON.stringify(reviews));
+  }, [reviews]);
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("Görsel boyutu 2MB'dan küçük olmalıdır.");
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhoto(reader.result as string);
@@ -27,8 +40,8 @@ const ReviewSection: React.FC = () => {
     if (!newComment.trim()) return;
 
     const newReview: Review = {
-      id: Date.now().toString(),
-      userName: 'You', // Mock user
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5), // Güvenli ID
+      userName: 'You', 
       rating: newRating,
       comment: newComment,
       date: 'Just Now',
