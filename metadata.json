@@ -1,0 +1,7 @@
+{
+  "name": "Copy of cosna",
+  "description": "Premium custom embroidery t-shirt shop with AI-powered design analysis and UGC features.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
